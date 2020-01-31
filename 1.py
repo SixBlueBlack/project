@@ -60,27 +60,13 @@ closed_chest_image = pygame.transform.scale(load_image('chest_closed.png', -1), 
 opened_chest_image = pygame.transform.scale(load_image('chest_open.png', -1), (45, 40))
 aim_image = pygame.transform.scale(load_image('aim.png'), (45, 45))
 aim2_image = pygame.transform.scale(load_image('aim2.png', -1), (30, 30))
+start_button_image = pygame.transform.scale(load_image('start.png'), (600, 300))
 
 
 def end_screen():
     pass
-    # global fon
-    # fon = pygame.transform.scale(load_image('fon1.jpg'), (800, 600))
-    # screen.blit(fon, (0, 0))
-
-    # while True:
-    # for event in pygame.event.get():
-    # if event.type == pygame.QUIT:
-    # terminate()
-    # elif event.type == pygame.KEYDOWN or event.type == pygame.MOUSEBUTTONDOWN:
-    # pass
-    # pygame.display.flip()
-    # clock.tick(FPS)
-
-
-def start_screen():
     global fon
-    fon = pygame.transform.scale(load_image('fon1.jpg'), (800, 600))
+    fon = pygame.transform.scale(load_image('end_screen.jpg'), (800, 600))
     screen.blit(fon, (0, 0))
 
     while True:
@@ -88,7 +74,30 @@ def start_screen():
             if event.type == pygame.QUIT:
                 terminate()
             elif event.type == pygame.KEYDOWN or event.type == pygame.MOUSEBUTTONDOWN:
-                return
+                pass
+        pygame.display.flip()
+        clock.tick(120)
+
+
+def start_screen():
+    global fon
+    start_group = pygame.sprite.Group()
+    screen.fill((0, 0, 0))
+    start_button = pygame.sprite.Sprite(start_group)
+    start_button.image = start_button_image
+    start_button.rect = start_button.image.get_rect()
+    start_button.rect.x = 100
+    start_button.rect.y = 100
+
+    while True:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                terminate()
+            elif event.type == pygame.MOUSEBUTTONDOWN:
+                y, x = pygame.mouse.get_pos()
+                if event.button == 1 and (100 < x < 400) and (100 < y < 700):
+                    return
+        start_group.draw(screen)
         pygame.display.flip()
         clock.tick(120)
 
@@ -332,7 +341,6 @@ class Cursor(pygame.sprite.Sprite):
             if 5 not in a2:
                 return
             a.get_hit()
-            print('e' + str(a.hp))
             if a.hp <= 0:
                 board.cash += randint(0, 2)
                 with open('data/money.txt', 'w') as f:
@@ -519,7 +527,6 @@ class Enemy(pygame.sprite.Sprite):
     def attack(self):
         player.hp -= randint(self.damage[0], self.damage[1])
         board.player_hp = player.hp
-        print(player.hp)
         return
 
     def get_hit(self):
@@ -540,7 +547,7 @@ class Player(pygame.sprite.Sprite):
     def __init__(self, pos_x, pos_y, x=False, y=False):
         super().__init__(all_sprites)
         self.image = player_image
-        self.damage = (9, 12)
+        self.damage = (10, 13)
         self.hp = board.player_hp
         if not (x and y):
             self.rect = self.image.get_rect().move(tile_width * pos_x + 2, tile_height * pos_y - 2)
