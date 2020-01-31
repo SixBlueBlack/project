@@ -526,6 +526,8 @@ class Enemy(pygame.sprite.Sprite):
 
     def attack(self):
         player.hp -= randint(self.damage[0], self.damage[1])
+        if player.hp < 0:
+            player.hp = 0
         board.player_hp = player.hp
         return
 
