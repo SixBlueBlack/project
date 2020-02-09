@@ -1,6 +1,4 @@
-import pygame
-import sys
-import os
+import pygame, sys, os, sqlite3
 from random import choice, randint
 
 
@@ -30,7 +28,7 @@ def load_level(filename):
 
 
 def end_screen():
-    global base
+    global base, player_hp
     pygame.mouse.set_visible(True)
     restart_group = pygame.sprite.Group()
     base.screen.fill((0, 0, 0))
@@ -49,6 +47,7 @@ def end_screen():
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 x, y = pygame.mouse.get_pos()
                 if event.button == 1 and (250 < x < 550) and (475 < y < 625):
+                    player_hp = 100
                     base = Base(1)
                     base.b()
                     return
@@ -65,16 +64,94 @@ def start_screen():
     start_button.rect = start_button.image.get_rect()
     start_button.rect.x = 100
     start_button.rect.y = 100
+    shop_button = pygame.sprite.Sprite(start_group)
+    shop_button.image = shop_button_image
+    shop_button.rect = shop_button.image.get_rect()
+    shop_button.rect.x = 315
+    shop_button.rect.y = 400
 
     while True:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 terminate()
             elif event.type == pygame.MOUSEBUTTONDOWN:
-                y, x = pygame.mouse.get_pos()
-                if event.button == 1 and (100 < x < 400) and (100 < y < 700):
+                x, y = pygame.mouse.get_pos()
+                print(x, y)
+                if event.button == 1 and (135 < y < 366) and (132 < x < 668):
                     return
+                elif event.button == 1 and (399 < y < 501) and (314 < x < 515):
+                    shop()
         start_group.draw(base.screen)
+        pygame.display.flip()
+        base.clock.tick(120)
+
+
+def shop():
+    base.screen.fill((0, 0, 0))
+    base.screen.blit(shop_background, (0, 0))
+    long_range_weapon, short_range_weapon, armor = e_model.on_sale()
+    goods_group = pygame.sprite.Group()
+
+    long_range_weapon_sprite = pygame.sprite.Sprite(goods_group)
+    long_range_weapon_sprite.image = pygame.transform.scale(load_image(long_range_weapon[3]), (100, 100))
+    long_range_weapon_sprite.rect = long_range_weapon_sprite.image.get_rect()
+    long_range_weapon_sprite.rect.y = 250
+    long_range_weapon_sprite.rect.x = 150
+
+    short_range_weapon_sprite = pygame.sprite.Sprite(goods_group)
+    short_range_weapon_sprite.image = pygame.transform.scale(load_image(short_range_weapon[3]), (100, 100))
+    short_range_weapon_sprite.rect = short_range_weapon_sprite.image.get_rect()
+    short_range_weapon_sprite.rect.y = 250
+    short_range_weapon_sprite.rect.x = 350
+
+    armor_sprite = pygame.sprite.Sprite(goods_group)
+    armor_sprite.image = pygame.transform.scale(load_image(armor[3]), (100, 100))
+    armor_sprite.rect = armor_sprite.image.get_rect()
+    armor_sprite.rect.y = 250
+    armor_sprite.rect.x = 550
+
+    font = pygame.font.SysFont('arial', 24)
+    text = font.render('Cost: ' + str(long_range_weapon[7]), 1, (0, 0, 0))
+    text_x = 162
+    text_y = 750 // 2 - text.get_height() // 2
+    base.screen.blit(text, (text_x, text_y))
+
+    text = font.render('Cost: ' + str(short_range_weapon[7]), 1, (0, 0, 0))
+    text_x = 365
+    text_y = 750 // 2 - text.get_height() // 2
+    base.screen.blit(text, (text_x, text_y))
+
+    text = font.render('Cost: ' + str(armor[7]), 1, (0, 0, 0))
+    text_x = 562
+    text_y = 750 // 2 - text.get_height() // 2
+    base.screen.blit(text, (text_x, text_y))
+
+    while True:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                terminate()
+            elif event.type == pygame.MOUSEBUTTONDOWN:
+                x, y = pygame.mouse.get_pos()
+                print(x, y)
+                if event.button == 1 and (249 < y < 351) and (149 < x < 351):
+                    e_model.purchase(long_range_weapon[0])
+                    with open('data/money.txt') as f:
+                        cash = int(f.read())
+                    with open('data/money.txt', 'w') as f:
+                        f.write(str(cash - long_range_weapon[7]))
+                elif event.button == 1 and (249 < y < 351) and (349 < x < 451):
+                    e_model.purchase(short_range_weapon[0])
+                    with open('data/money.txt') as f:
+                        cash = int(f.read())
+                    with open('data/money.txt', 'w') as f:
+                        f.write(str(cash - short_range_weapon[7]))
+                elif event.button == 1 and (249 < y < 351) and (549 < x < 651):
+                    e_model.purchase(armor[0])
+                    with open('data/money.txt') as f:
+                        cash = int(f.read())
+                    with open('data/money.txt', 'w') as f:
+                        f.write(str(cash - armor[7]))
+        goods_group.draw(base.screen)
         pygame.display.flip()
         base.clock.tick(120)
 
@@ -121,6 +198,23 @@ def update_screen():
     else:
         pygame.time.delay(75)
         base.board.generation = False
+
+
+class EventsModel:
+    def __init__(self):
+        self.conn = sqlite3.connect('data/items.db')
+        self.cursor = self.conn.cursor()
+
+    def on_sale(self):
+        result = []
+        for elem in ['long-range', 'short-range', 'armor']:
+            result.append(self.cursor.execute("""SELECT * FROM items
+             WHERE queue = ? and type=?""", (1, elem)).fetchone())
+        return result
+
+    def purchase(self, i):
+        self.cursor.execute("UPDATE items SET unlocked=? WHERE id=?", ('True', i))
+        self.conn.commit()
 
 
 class Board:
@@ -309,7 +403,7 @@ class IndestructibleWall(pygame.sprite.Sprite):
 class Portal(pygame.sprite.Sprite):
     def __init__(self, pos_x, pos_y):
         super().__init__(base.portal_group, base.all_sprites)
-        self.image = portal_image
+        self.image = portal_image1
         self.rect = self.image.get_rect().move(base.tile_width * pos_x + 8, base.tile_height * pos_y + 3)
 
     def update(self, *args):
@@ -317,13 +411,13 @@ class Portal(pygame.sprite.Sprite):
         if base.portal_animation > 80:
             base.portal_animation = 1
         if base.portal_animation <= 20:
-            self.image = portal_image
+            self.image = portal_image1
         elif base.portal_animation <= 40:
-            self.image = pygame.transform.scale(load_image('portal2.png', -1), (35, 45))
+            self.image = portal_image2
         elif base.portal_animation <= 60:
-            self.image = pygame.transform.scale(load_image('portal3.png', -1), (35, 45))
+            self.image = portal_image3
         else:
-            self.image = pygame.transform.scale(load_image('portal4.png', -1), (35, 45))
+            self.image = portal_image4
 
 
 class Cursor(pygame.sprite.Sprite):
@@ -356,7 +450,7 @@ class Cursor(pygame.sprite.Sprite):
                 return
             a.get_hit()
             if a.hp <= 0:
-                base.board.cash += randint(0, 2)
+                base.board.cash += randint(0, 2 * base.level)
                 with open('data/money.txt', 'w') as f:
                     f.write(str(base.board.cash))
                 base.board.board[a.y][a.x] = 0
@@ -688,6 +782,7 @@ class Base:
         self.board.player_hp = player_hp
 
 
+e_model = EventsModel()
 player_hp = 100
 base = Base(1)
 
@@ -703,7 +798,13 @@ aim_image = pygame.transform.scale(load_image('aim.png'), (45, 45))
 aim2_image = pygame.transform.scale(load_image('aim2.png', -1), (30, 30))
 start_button_image = pygame.transform.scale(load_image('start.png'), (600, 300))
 restart_button_image = pygame.transform.scale(load_image('restart_button.png', -1), (300, 150))
-portal_image = pygame.transform.scale(load_image('portal1.png', -1), (35, 45))
+shop_button_image = pygame.transform.scale(load_image('shop.png'), (200, 100))
+shop_background = pygame.transform.scale(load_image('shop_background.jpg'), (800, 600))
+portal_image1 = pygame.transform.scale(load_image('portal1.png', -1), (35, 45))
+portal_image2 = pygame.transform.scale(load_image('portal2.png', -1), (35, 45))
+portal_image3 = pygame.transform.scale(load_image('portal3.png', -1), (35, 45))
+portal_image4 = pygame.transform.scale(load_image('portal4.png', -1), (35, 45))
+sold_out_sprite = pygame.transform.scale(load_image('sold_out.png'), (100, 100))
 
 start_screen()
 base.b()
