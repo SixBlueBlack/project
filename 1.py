@@ -3,28 +3,6 @@ import sys
 import os
 from random import choice, randint
 
-title = "map.txt"
-
-fon = None
-k = 0
-r = 0
-count = 0
-pygame.init()
-screen = pygame.display.set_mode((800, 600))
-screen.fill((0, 0, 0))
-pygame.display.flip()
-clock = pygame.time.Clock()
-player = None
-up, down, left, right = False, False, False, False
-all_sprites = pygame.sprite.Group()
-tiles_group = pygame.sprite.Group()
-walls_group = pygame.sprite.Group()
-chests_group = pygame.sprite.Group()
-enemies_group = pygame.sprite.Group()
-aim_group = pygame.sprite.Group()
-indestructible_walls_group = pygame.sprite.Group()
-tile_width = tile_height = 50
-
 
 def load_image(name, colorkey=None):
     fullname = os.path.join('data', name)
@@ -51,38 +29,37 @@ def load_level(filename):
     return list(map(lambda x: x.ljust(max_width, '.'), level_map))
 
 
-tile_images = {'empty': pygame.transform.scale(load_image('empty.png'), (50, 50)),
-               'wall': pygame.transform.scale(load_image('wall.png'), (50, 50)),
-               'indestructible_wall': pygame.transform.scale(load_image('indestructible_wall.png'), (50, 50))}
-player_image = pygame.transform.scale(load_image('down1.png', -1), (45, 55))
-enemy_image = pygame.transform.scale(load_image('enemy.png', -1), (50, 50))
-closed_chest_image = pygame.transform.scale(load_image('chest_closed.png', -1), (45, 40))
-opened_chest_image = pygame.transform.scale(load_image('chest_open.png', -1), (45, 40))
-aim_image = pygame.transform.scale(load_image('aim.png'), (45, 45))
-aim2_image = pygame.transform.scale(load_image('aim2.png', -1), (30, 30))
-start_button_image = pygame.transform.scale(load_image('start.png'), (600, 300))
-
-
 def end_screen():
-    pass
-    global fon
-    fon = pygame.transform.scale(load_image('end_screen.jpg'), (800, 600))
-    screen.blit(fon, (0, 0))
+    global base
+    pygame.mouse.set_visible(True)
+    restart_group = pygame.sprite.Group()
+    base.screen.fill((0, 0, 0))
+    restart_button = pygame.sprite.Sprite(restart_group)
+    restart_button.image = restart_button_image
+    restart_button.rect = restart_button.image.get_rect()
+    restart_button.rect.x = 250
+    restart_button.rect.y = 475
+    base.fon = pygame.transform.scale(load_image('end_screen.jpg'), (800, 600))
+    base.screen.blit(base.fon, (0, 0))
 
     while True:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 terminate()
-            elif event.type == pygame.KEYDOWN or event.type == pygame.MOUSEBUTTONDOWN:
-                pass
+            elif event.type == pygame.MOUSEBUTTONDOWN:
+                x, y = pygame.mouse.get_pos()
+                if event.button == 1 and (250 < x < 550) and (475 < y < 625):
+                    base = Base(1)
+                    base.b()
+                    return
+        restart_group.draw(base.screen)
         pygame.display.flip()
-        clock.tick(120)
+        base.clock.tick(120)
 
 
 def start_screen():
-    global fon
     start_group = pygame.sprite.Group()
-    screen.fill((0, 0, 0))
+    base.screen.fill((0, 0, 0))
     start_button = pygame.sprite.Sprite(start_group)
     start_button.image = start_button_image
     start_button.rect = start_button.image.get_rect()
@@ -97,48 +74,53 @@ def start_screen():
                 y, x = pygame.mouse.get_pos()
                 if event.button == 1 and (100 < x < 400) and (100 < y < 700):
                     return
-        start_group.draw(screen)
+        start_group.draw(base.screen)
         pygame.display.flip()
-        clock.tick(120)
+        base.clock.tick(120)
 
 
 def ui():
     font = pygame.font.SysFont('arial', 18)
-    text = font.render('Hp: ' + str(board.player_hp), 1, (100, 255, 100))
+    text = font.render('Hp: ' + str(base.board.player_hp), 1, (100, 255, 100))
     text_x = 0
     text_y = 50 // 2 - text.get_height() // 2
-    screen.blit(text, (text_x, text_y))
+    base.screen.blit(text, (text_x, text_y))
 
-    text = font.render('Money: ' + str(board.cash), 1, (253, 233, 16))
+    text = font.render('Money: ' + str(base.board.cash), 1, (253, 233, 16))
     text_x = 70
     text_y = 50 // 2 - text.get_height() // 2
-    screen.blit(text, (text_x, text_y))
+    base.screen.blit(text, (text_x, text_y))
+
+    text = font.render('Level: ' + str(base.level), 1, (255, 77, 0))
+    text_x = 700
+    text_y = 50 // 2 - text.get_height() // 2
+    base.screen.blit(text, (text_x, text_y))
 
 
 def update_screen():
-    if not board.generation:
-        global player, cursor
-        player.image = player_image
-        player.update()
-        if not enemies_group:
-            board.turn = 'player'
-        if board.turn == 'enemy':
-            for enemy in enemies_group:
+    if not base.board.generation:
+        base.player.image = player_image
+        base.player.update()
+        base.portal_group.update()
+        if not base.enemies_group:
+            base.board.turn = 'player'
+        if base.board.turn == 'enemy':
+            for enemy in base.enemies_group:
                 enemy.update()
-        screen.fill((0, 0, 0))
-        all_sprites.draw(screen)
-        camera.update(player)
-        all_sprites.add(aim)
+        base.screen.fill((0, 0, 0))
+        base.all_sprites.draw(base.screen)
+        base.camera.update(base.player)
+        base.all_sprites.add(base.aim)
         ui()
 
-        for sprite in all_sprites:
-            if sprite not in aim_group:
-                camera.apply(sprite)
+        for sprite in base.all_sprites:
+            if sprite not in base.aim_group:
+                base.camera.apply(sprite)
 
         pygame.display.flip()
     else:
         pygame.time.delay(75)
-        board.generation = False
+        base.board.generation = False
 
 
 class Board:
@@ -156,7 +138,7 @@ class Board:
             self.cash = int(f.read())
 
     def load(self):
-        lev = load_level(title)
+        lev = load_level(base.title)
         for el in lev:
             self.board.append(list(el))
         for i in range(len(self.board)):
@@ -176,6 +158,11 @@ class Board:
                          self.board[i + 1][j - 1], self.board[i + 1][j + 1], self.board[i + 1][j], self.board[i][j + 1]]
                     if 3 in z and choice([1, 2]) == 1:
                         self.board[i][j] = 1
+        r1, r2 = randint(1, 31), randint(1, 31)
+        while self.board[r1][r2] != 0:
+            r1, r2 = randint(1, 31), randint(1, 31)
+        self.board[r1][r2] = 10
+        print(r1, r2)
         for i in range(len(self.board)):
             for j in range(len(self.board[i])):
                 if self.board[i][j] == 3:
@@ -205,7 +192,7 @@ class Board:
             for x in range(len(self.board[y])):
                 if not self.vis[y][x]:
                     continue
-                if self.board[y][x] in [0, 5, 7]:
+                if self.board[y][x] in [0, 5, 7, 10]:
                     Tile('empty', x, y)
                 elif self.board[y][x] == 6:
                     Tile('empty', x, y)
@@ -223,54 +210,57 @@ class Board:
                     continue
                 if self.board[y][x] == 7:
                     Enemy(x, y)
+                elif self.board[y][x] == 10:
+                    print(x, y)
+                    Portal(x, y)
         for y in range(len(self.board)):
             for x in range(len(self.board[y])):
                 if self.board[y][x] == 5:
                     new_player = Player(x, y)
-        all_sprites.remove(aim)
-        all_sprites.add(aim)
+        base.all_sprites.remove(base.aim)
+        base.all_sprites.add(base.aim)
         return new_player
 
     def vision(self, x, y):
         self.vis[x][y] = True
         self.used.append((x, y))
-        if self.board[x][y + 1] in [0, 6, 7, 8] and (x, y + 1) not in self.used:
+        if self.board[x][y + 1] in [0, 6, 7, 8, 10] and (x, y + 1) not in self.used:
             self.vision(x, y + 1)
-        if self.board[x][y + 1] not in [0, 6, 7, 8] and (x, y + 1) not in self.used:
+        if self.board[x][y + 1] not in [0, 6, 7, 8, 10] and (x, y + 1) not in self.used:
             self.vis[x][y + 1] = True
             self.used.append((x, y + 1))
-        if self.board[x][y - 1] in [0, 6, 7, 8] and (x, y - 1) not in self.used:
+        if self.board[x][y - 1] in [0, 6, 7, 8, 10] and (x, y - 1) not in self.used:
             self.vision(x, y - 1)
-        if self.board[x][y - 1] not in [0, 6, 7, 8] and (x, y - 1) not in self.used:
+        if self.board[x][y - 1] not in [0, 6, 7, 8, 10] and (x, y - 1) not in self.used:
             self.vis[x][y - 1] = True
             self.used.append((x, y - 1))
-        if self.board[x + 1][y] in [0, 6, 7, 8] and (x + 1, y) not in self.used:
+        if self.board[x + 1][y] in [0, 6, 7, 8, 10] and (x + 1, y) not in self.used:
             self.vision(x + 1, y)
-        if self.board[x + 1][y] not in [0, 6, 7, 8] and (x + 1, y) not in self.used:
+        if self.board[x + 1][y] not in [0, 6, 7, 8, 10] and (x + 1, y) not in self.used:
             self.vis[x + 1][y] = True
             self.used.append((x + 1, y))
-        if self.board[x - 1][y] in [0, 6, 7, 8] and (x - 1, y) not in self.used:
+        if self.board[x - 1][y] in [0, 6, 7, 8, 10] and (x - 1, y) not in self.used:
             self.vision(x - 1, y)
-        if self.board[x - 1][y] not in [0, 6, 7, 8] and (x - 1, y) not in self.used:
+        if self.board[x - 1][y] not in [0, 6, 7, 8, 10] and (x - 1, y) not in self.used:
             self.vis[x - 1][y] = True
             self.used.append((x - 1, y))
 
     def move(self, way):
         flag = True
-        for chest in chests_group:
+        for chest in base.chests_group:
             if chest.x == self.player[1] and chest.y == self.player[0]:
                 flag = False
                 self.board[self.player[0]][self.player[1]] = 8
                 break
         if flag:
             self.board[self.player[0]][self.player[1]] = 0
-        if way == 'up' and self.board[self.player[0] - 1][self.player[1]] in [0, 6, 8]:
+        if way == 'up' and self.board[self.player[0] - 1][self.player[1]] in [0, 6, 8, 10]:
             self.player = (self.player[0] - 1, self.player[1])
-        elif way == 'down' and self.board[self.player[0] + 1][self.player[1]] in [0, 6, 8]:
+        elif way == 'down' and self.board[self.player[0] + 1][self.player[1]] in [0, 6, 8, 10]:
             self.player = (self.player[0] + 1, self.player[1])
-        elif way == 'left' and self.board[self.player[0]][self.player[1] - 1] in [0, 6, 8]:
+        elif way == 'left' and self.board[self.player[0]][self.player[1] - 1] in [0, 6, 8, 10]:
             self.player = (self.player[0], self.player[1] - 1)
-        elif way == 'right' and self.board[self.player[0]][self.player[1] + 1] in [0, 6, 8]:
+        elif way == 'right' and self.board[self.player[0]][self.player[1] + 1] in [0, 6, 8, 10]:
             self.player = (self.player[0], self.player[1] + 1)
         else:
             self.board[self.player[0]][self.player[1]] = 5
@@ -295,78 +285,102 @@ class Camera:
 
 class Tile(pygame.sprite.Sprite):
     def __init__(self, tile_type, pos_x, pos_y):
-        super().__init__(tiles_group, all_sprites)
+        super().__init__(base.tiles_group, base.all_sprites)
         self.image = tile_images[tile_type]
-        self.rect = self.image.get_rect().move(tile_width * pos_x, tile_height * pos_y)
+        self.rect = self.image.get_rect().move(base.tile_width * pos_x, base.tile_height * pos_y)
 
 
 class Wall(pygame.sprite.Sprite):
     def __init__(self, tile_type, pos_x, pos_y):
-        super().__init__(walls_group, all_sprites)
+        super().__init__(base.walls_group, base.all_sprites)
         self.image = tile_images[tile_type]
         self.x = pos_x
         self.y = pos_y
-        self.rect = self.image.get_rect().move(tile_width * pos_x, tile_height * pos_y)
+        self.rect = self.image.get_rect().move(base.tile_width * pos_x, base.tile_height * pos_y)
 
 
 class IndestructibleWall(pygame.sprite.Sprite):
     def __init__(self, tile_type, pos_x, pos_y):
-        super().__init__(indestructible_walls_group, all_sprites)
+        super().__init__(base.indestructible_walls_group, base.all_sprites)
         self.image = tile_images[tile_type]
-        self.rect = self.image.get_rect().move(tile_width * pos_x, tile_height * pos_y)
+        self.rect = self.image.get_rect().move(base.tile_width * pos_x, base.tile_height * pos_y)
+
+
+class Portal(pygame.sprite.Sprite):
+    def __init__(self, pos_x, pos_y):
+        super().__init__(base.portal_group, base.all_sprites)
+        self.image = portal_image
+        self.rect = self.image.get_rect().move(base.tile_width * pos_x + 8, base.tile_height * pos_y + 3)
+
+    def update(self, *args):
+        base.portal_animation += 1
+        if base.portal_animation > 80:
+            base.portal_animation = 1
+        if base.portal_animation <= 20:
+            self.image = portal_image
+        elif base.portal_animation <= 40:
+            self.image = pygame.transform.scale(load_image('portal2.png', -1), (35, 45))
+        elif base.portal_animation <= 60:
+            self.image = pygame.transform.scale(load_image('portal3.png', -1), (35, 45))
+        else:
+            self.image = pygame.transform.scale(load_image('portal4.png', -1), (35, 45))
 
 
 class Cursor(pygame.sprite.Sprite):
     def __init__(self, pos):
-        super().__init__(all_sprites)
+        super().__init__(base.all_sprites)
         self.rect = pos
 
     def update(self, *args):
-        global player, cursor
-        a0 = pygame.sprite.spritecollideany(cursor, aim_group)
-        a = pygame.sprite.spritecollideany(cursor, enemies_group)
-        a1 = pygame.sprite.spritecollideany(cursor, walls_group)
+        a0 = pygame.sprite.spritecollideany(base.cursor, base.aim_group)
+        a = pygame.sprite.spritecollideany(base.cursor, base.enemies_group)
+        a1 = pygame.sprite.spritecollideany(base.cursor, base.walls_group)
         if a0:
-            if cursor.image == aim2_image:
-                cursor.image = pygame.transform.scale(load_image("cursor.png", -1), (20, 21))
+            if base.cursor.image == aim2_image:
+                base.cursor.image = pygame.transform.scale(load_image("cursor.png", -1), (20, 21))
             else:
-                cursor.image = aim2_image
+                base.cursor.image = aim2_image
         elif a:
-            a2 = [board.board[a.y - 1][a.x], board.board[a.y][a.x - 1], board.board[a.y + 1][a.x],
-                  board.board[a.y][a.x + 1]]
-            if cursor.image == aim2_image:
-                a2.extend([board.board[a.y - 2][a.x], board.board[a.y][a.x - 2], board.board[a.y + 2][a.x],
-                           board.board[a.y][a.x + 2], board.board[a.y + 1][a.x + 1], board.board[a.y + 1][a.x - 1],
-                           board.board[a.y - 1][a.x + 1], board.board[a.y - 1][a.x - 1]])
+            a2 = [base.board.board[a.y - 1][a.x], base.board.board[a.y][a.x - 1], base.board.board[a.y + 1][a.x],
+                  base.board.board[a.y][a.x + 1]]
+            try:
+                if base.cursor.image == aim2_image:
+                    a2.extend(
+                        [base.board.board[a.y - 2][a.x], base.board.board[a.y][a.x - 2], base.board.board[a.y + 2][a.x],
+                         base.board.board[a.y][a.x + 2], base.board.board[a.y + 1][a.x + 1],
+                         base.board.board[a.y + 1][a.x - 1], base.board.board[a.y - 1][a.x + 1],
+                         base.board.board[a.y - 1][a.x - 1]])
+            except IndexError:
+                pass
             if 5 not in a2:
                 return
             a.get_hit()
             if a.hp <= 0:
-                board.cash += randint(0, 2)
+                base.board.cash += randint(0, 2)
                 with open('data/money.txt', 'w') as f:
-                    f.write(str(board.cash))
-                board.board[a.y][a.x] = 0
-                all_sprites.remove(a)
-                enemies_group.remove(a)
-            cursor.image = pygame.transform.scale(load_image("cursor.png", -1), (20, 21))
-            board.turn = 'enemy'
+                    f.write(str(base.board.cash))
+                base.board.board[a.y][a.x] = 0
+                base.all_sprites.remove(a)
+                base.enemies_group.remove(a)
+            base.cursor.image = pygame.transform.scale(load_image("cursor.png", -1), (20, 21))
+            base.board.turn = 'enemy'
         elif a1:
-            board.board[a1.y][a1.x] = 0
-            all_sprites.empty()
-            walls_group.empty()
-            indestructible_walls_group.empty()
-            tiles_group.empty()
-            enemies_group.empty()
-            player = board.generate_level()
-            cursor = Cursor(pygame.mouse.get_pos)
-            cursor.image = pygame.transform.scale(load_image("cursor.png", -1), (20, 21))
-            cursor.rect = cursor.image.get_rect()
-            board.turn = 'enemy'
+            base.board.board[a1.y][a1.x] = 0
+            base.all_sprites.empty()
+            base.walls_group.empty()
+            base.indestructible_walls_group.empty()
+            base.tiles_group.empty()
+            base.enemies_group.empty()
+            base.player = base.board.generate_level()
+            base.cursor = Cursor(pygame.mouse.get_pos)
+            base.cursor.image = pygame.transform.scale(load_image("cursor.png", -1), (20, 21))
+            base.cursor.rect = base.cursor.image.get_rect()
+            base.board.turn = 'enemy'
 
 
 class Chest(pygame.sprite.Sprite):
     def __init__(self, pos_x, pos_y, status):
-        super().__init__(all_sprites, chests_group)
+        super().__init__(base.all_sprites, base.chests_group)
         self.x = pos_x
         self.y = pos_y
         self.status = status
@@ -374,281 +388,347 @@ class Chest(pygame.sprite.Sprite):
             self.image = opened_chest_image
         else:
             self.image = closed_chest_image
-        self.rect = self.image.get_rect().move(tile_width * pos_x + 2, tile_height * pos_y + 8)
+        self.rect = self.image.get_rect().move(base.tile_width * pos_x + 2, base.tile_height * pos_y + 8)
 
 
 class Enemy(pygame.sprite.Sprite):
-    def __init__(self, pos_x, pos_y):
-        super().__init__(all_sprites, enemies_group)
+    def __init__(self, pos_x, pos_y, boss=False):
+        super().__init__(base.all_sprites, base.enemies_group)
         self.x = pos_x
         self.y = pos_y
-        self.damage = (8, 12)
-        self.hp = 50
-        self.image = enemy_image
-        self.rect = self.image.get_rect().move(tile_width * pos_x + 2, tile_height * pos_y + 2)
+        if boss:
+            self.damage = (20, 25)
+            self.hp = 300
+            self.image = boss_image
+        else:
+            self.damage = (7 + 1 * base.level, 11 + 1 * base.level)
+            self.hp = 10 + 20 * base.level
+            self.image = enemy_image
+        self.rect = self.image.get_rect().move(base.tile_width * pos_x + 2, base.tile_height * pos_y + 2)
 
     def move(self):
         try:
-            a = [board.board[self.y][self.x + 1], board.board[self.y][self.x + 2], board.board[self.y][self.x + 3]]
+            a = [base.board.board[self.y][self.x + 1], base.board.board[self.y][self.x + 2],
+                 base.board.board[self.y][self.x + 3]]
             if 5 in a and (1 not in a or a.index(5) < a.index(1)):
-                board.board[self.y][self.x] = 0
+                base.board.board[self.y][self.x] = 0
                 self.x += 1
                 self.rect.x += 50
-                board.board[self.y][self.x] = 7
+                base.board.board[self.y][self.x] = 7
                 return
         except IndexError:
             pass
         try:
-            a = [board.board[self.y][self.x - 1], board.board[self.y][self.x - 2], board.board[self.y][self.x - 3]]
+            a = [base.board.board[self.y][self.x - 1], base.board.board[self.y][self.x - 2],
+                 base.board.board[self.y][self.x - 3]]
             if 5 in a and (1 not in a or a.index(5) < a.index(1)):
-                board.board[self.y][self.x] = 0
+                base.board.board[self.y][self.x] = 0
                 self.x -= 1
                 self.rect.x -= 50
-                board.board[self.y][self.x] = 7
+                base.board.board[self.y][self.x] = 7
                 return
         except IndexError:
             pass
         try:
-            a = [board.board[self.y + 1][self.x], board.board[self.y + 2][self.x], board.board[self.y + 3][self.x]]
+            a = [base.board.board[self.y + 1][self.x], base.board.board[self.y + 2][self.x],
+                 base.board.board[self.y + 3][self.x]]
             if 5 in a and (1 not in a or a.index(5) < a.index(1)):
-                board.board[self.y][self.x] = 0
+                base.board.board[self.y][self.x] = 0
                 self.y += 1
                 self.rect.y += 50
-                board.board[self.y][self.x] = 7
+                base.board.board[self.y][self.x] = 7
                 return
         except IndexError:
             pass
         try:
-            a = [board.board[self.y - 1][self.x], board.board[self.y - 2][self.x], board.board[self.y - 3][self.x]]
+            a = [base.board.board[self.y - 1][self.x], base.board.board[self.y - 2][self.x],
+                 base.board.board[self.y - 3][self.x]]
             if 5 in a and (1 not in a or a.index(5) < a.index(1)):
-                board.board[self.y][self.x] = 0
+                base.board.board[self.y][self.x] = 0
                 self.y -= 1
                 self.rect.y -= 50
-                board.board[self.y][self.x] = 7
+                base.board.board[self.y][self.x] = 7
                 return
         except IndexError:
             pass
 
-        if board.board[self.y - 1][self.x - 1] == 5:
-            if board.board[self.y - 1][self.x] != 1:
-                board.board[self.y][self.x] = 0
+        if base.board.board[self.y - 1][self.x - 1] == 5:
+            if base.board.board[self.y - 1][self.x] != 1:
+                base.board.board[self.y][self.x] = 0
                 self.y -= 1
                 self.rect.y -= 50
-                board.board[self.y][self.x] = 7
+                base.board.board[self.y][self.x] = 7
                 return
-            if board.board[self.y][self.x - 1] != 1:
-                board.board[self.y][self.x] = 0
+            if base.board.board[self.y][self.x - 1] != 1:
+                base.board.board[self.y][self.x] = 0
                 self.x -= 1
                 self.rect.x -= 50
-                board.board[self.y][self.x] = 7
+                base.board.board[self.y][self.x] = 7
                 return
 
-        if board.board[self.y - 1][self.x + 1] == 5:
-            if board.board[self.y - 1][self.x] != 1:
-                board.board[self.y][self.x] = 0
+        if base.board.board[self.y - 1][self.x + 1] == 5:
+            if base.board.board[self.y - 1][self.x] != 1:
+                base.board.board[self.y][self.x] = 0
                 self.y -= 1
                 self.rect.y -= 50
-                board.board[self.y][self.x] = 7
+                base.board.board[self.y][self.x] = 7
                 return
-            if board.board[self.y][self.x + 1] != 1:
-                board.board[self.y][self.x] = 0
+            if base.board.board[self.y][self.x + 1] != 1:
+                base.board.board[self.y][self.x] = 0
                 self.x += 1
                 self.rect.x += 50
-                board.board[self.y][self.x] = 7
+                base.board.board[self.y][self.x] = 7
                 return
 
-        if board.board[self.y + 1][self.x - 1] == 5:
-            if board.board[self.y + 1][self.x] != 1:
-                board.board[self.y][self.x] = 0
+        if base.board.board[self.y + 1][self.x - 1] == 5:
+            if base.board.board[self.y + 1][self.x] != 1:
+                base.board.board[self.y][self.x] = 0
                 self.y += 1
                 self.rect.y += 50
-                board.board[self.y][self.x] = 7
+                base.board.board[self.y][self.x] = 7
                 return
-            if board.board[self.y][self.x - 1] != 1:
-                board.board[self.y][self.x] = 0
+            if base.board.board[self.y][self.x - 1] != 1:
+                base.board.board[self.y][self.x] = 0
                 self.x -= 1
                 self.rect.x -= 50
-                board.board[self.y][self.x] = 7
+                base.board.board[self.y][self.x] = 7
                 return
-        if board.board[self.y + 1][self.x + 1] == 5:
-            if board.board[self.y + 1][self.x] != 1:
-                board.board[self.y][self.x] = 0
+        if base.board.board[self.y + 1][self.x + 1] == 5:
+            if base.board.board[self.y + 1][self.x] != 1:
+                base.board.board[self.y][self.x] = 0
                 self.y += 1
                 self.rect.y += 50
-                board.board[self.y][self.x] = 7
+                base.board.board[self.y][self.x] = 7
                 return
-            if board.board[self.y][self.x + 1] != 1:
-                board.board[self.y][self.x] = 0
+            if base.board.board[self.y][self.x + 1] != 1:
+                base.board.board[self.y][self.x] = 0
                 self.x += 1
                 self.rect.x += 50
-                board.board[self.y][self.x] = 7
+                base.board.board[self.y][self.x] = 7
                 return
 
         n1 = [1, 2, 3, 4]
         for _ in range(4):
             n = choice(n1)
             if n == 1:
-                if board.board[self.y - 1][self.x] == 0:
-                    board.board[self.y][self.x] = 0
+                if base.board.board[self.y - 1][self.x] == 0:
+                    base.board.board[self.y][self.x] = 0
                     self.y -= 1
                     self.rect.y -= 50
-                    board.board[self.y][self.x] = 7
+                    base.board.board[self.y][self.x] = 7
                     break
                 else:
                     n1.remove(1)
             if n == 2:
-                if board.board[self.y + 1][self.x] == 0:
-                    board.board[self.y][self.x] = 0
+                if base.board.board[self.y + 1][self.x] == 0:
+                    base.board.board[self.y][self.x] = 0
                     self.y += 1
                     self.rect.y += 50
-                    board.board[self.y][self.x] = 7
+                    base.board.board[self.y][self.x] = 7
                     break
                 else:
                     n1.remove(2)
             if n == 3:
-                if board.board[self.y][self.x - 1] == 0:
-                    board.board[self.y][self.x] = 0
+                if base.board.board[self.y][self.x - 1] == 0:
+                    base.board.board[self.y][self.x] = 0
                     self.x -= 1
                     self.rect.x -= 50
-                    board.board[self.y][self.x] = 7
+                    base.board.board[self.y][self.x] = 7
                     break
                 else:
                     n1.remove(3)
             if n == 4:
-                if board.board[self.y][self.x + 1] == 0:
-                    board.board[self.y][self.x] = 0
+                if base.board.board[self.y][self.x + 1] == 0:
+                    base.board.board[self.y][self.x] = 0
                     self.x += 1
                     self.rect.x += 50
-                    board.board[self.y][self.x] = 7
+                    base.board.board[self.y][self.x] = 7
                     break
                 else:
                     n1.remove(4)
 
     def attack(self):
-        player.hp -= randint(self.damage[0], self.damage[1])
-        if player.hp < 0:
-            player.hp = 0
-        board.player_hp = player.hp
+        base.player.hp -= randint(self.damage[0], self.damage[1])
+        if base.player.hp < 0:
+            base.player.hp = 0
+        base.board.player_hp = base.player.hp
         return
 
     def get_hit(self):
-        self.hp -= randint(player.damage[0], player.damage[1])
+        self.hp -= randint(base.player.damage[0], base.player.damage[1])
 
     def update(self, *args):
-        if (self.x + 1 == board.player[1] and self.y == board.player[0]) or (
-                self.x - 1 == board.player[1] and self.y == board.player[0]) or (
-                self.x == board.player[1] and self.y - 1 == board.player[0]) or (
-                self.x == board.player[1] and self.y + 1 == board.player[0]):
+        if (self.x + 1 == base.board.player[1] and self.y == base.board.player[0]) or (
+                self.x - 1 == base.board.player[1] and self.y == base.board.player[0]) or (
+                self.x == base.board.player[1] and self.y - 1 == base.board.player[0]) or (
+                self.x == base.board.player[1] and self.y + 1 == base.board.player[0]):
             self.attack()
         else:
             self.move()
-        board.turn = 'player'
+        base.board.turn = 'player'
 
 
 class Player(pygame.sprite.Sprite):
     def __init__(self, pos_x, pos_y, x=False, y=False):
-        super().__init__(all_sprites)
+        super().__init__(base.all_sprites)
         self.image = player_image
         self.damage = (10, 13)
-        self.hp = board.player_hp
+        self.hp = base.board.player_hp
         if not (x and y):
-            self.rect = self.image.get_rect().move(tile_width * pos_x + 2, tile_height * pos_y - 2)
+            self.rect = self.image.get_rect().move(base.tile_width * pos_x + 2, base.tile_height * pos_y - 2)
         else:
             self.rect = self.image.get_rect().move(x, y)
 
     def update(self, *args):
-        a = pygame.sprite.spritecollideany(player, chests_group)
+        global base, player_hp
+        a = pygame.sprite.spritecollideany(base.player, base.chests_group)
         if a and a.status != 'open':
             a.status = 'open'
-            board.board[a.y][a.x] = 8
+            base.board.board[a.y][a.x] = 8
             a.image = opened_chest_image
+
+        if pygame.sprite.spritecollideany(base.player, base.portal_group):
+            player_hp = base.board.player_hp
+            base = Base(base.level + 1)
+            base.b()
 
         if self.hp <= 0:
             end_screen()
-        global player_image, k, r, pressed, count
-        if count != 0 or (pressed and board.move(pressed)):
-            k += 1
-            if k > 60:
-                k = 1
-            if k <= 20:
-                r = 1
-            elif k <= 40:
-                r = 2
+        global player_image
+        if base.count != 0 or (base.pressed and base.board.move(base.pressed)):
+            base.k += 1
+            if base.k > 60:
+                base.k = 1
+            if base.k <= 20:
+                base.r = 1
+            elif base.k <= 40:
+                base.r = 2
             else:
-                r = 3
-            if pressed == 'down':
-                player_image = pygame.transform.scale(load_image('down' + str(r) + '.png', -1), (45, 55))
-            elif pressed == 'up':
-                player_image = pygame.transform.scale(load_image('up' + str(r) + '.png', -1), (45, 55))
-            elif pressed == 'left':
-                player_image = pygame.transform.scale(load_image('left' + str(r) + '.png', -1), (45, 55))
-            elif pressed == 'right':
-                player_image = pygame.transform.scale(load_image('right' + str(r) + '.png', -1), (45, 55))
-            if pressed == 'up':
+                base.r = 3
+            if base.pressed == 'down':
+                player_image = pygame.transform.scale(load_image('down' + str(base.r) + '.png', -1), (45, 55))
+            elif base.pressed == 'up':
+                player_image = pygame.transform.scale(load_image('up' + str(base.r) + '.png', -1), (45, 55))
+            elif base.pressed == 'left':
+                player_image = pygame.transform.scale(load_image('left' + str(base.r) + '.png', -1), (45, 55))
+            elif base.pressed == 'right':
+                player_image = pygame.transform.scale(load_image('right' + str(base.r) + '.png', -1), (45, 55))
+            if base.pressed == 'up':
                 self.rect.y -= 1
-                cursor.rect.y -= 1
-            elif pressed == 'down':
+                base.cursor.rect.y -= 1
+            elif base.pressed == 'down':
                 self.rect.y += 1
-                cursor.rect.y += 1
-            elif pressed == 'right':
+                base.cursor.rect.y += 1
+            elif base.pressed == 'right':
                 self.rect.x += 1
-                cursor.rect.x += 1
-            elif pressed == 'left':
+                base.cursor.rect.x += 1
+            elif base.pressed == 'left':
                 self.rect.x -= 1
-                cursor.rect.x -= 1
-            count += 1
+                base.cursor.rect.x -= 1
+            base.count += 1
         else:
-            count = 50
-        if count == 50:
-            if pressed == 'down':
+            base.count = 50
+        if base.count == 50:
+            if base.pressed == 'down':
                 player_image = pygame.transform.scale(load_image('down1.png', -1), (45, 55))
-            elif pressed == 'up':
+            elif base.pressed == 'up':
                 player_image = pygame.transform.scale(load_image('up1.png', -1), (45, 55))
-            elif pressed == 'left':
+            elif base.pressed == 'left':
                 player_image = pygame.transform.scale(load_image('left1.png', -1), (45, 55))
-            elif pressed == 'right':
+            elif base.pressed == 'right':
                 player_image = pygame.transform.scale(load_image('right1.png', -1), (45, 55))
-            if pressed:
-                board.turn = 'enemy'
-            pressed = ''
-            count = 0
+            if base.pressed:
+                base.board.turn = 'enemy'
+            base.pressed = ''
+            base.count = 0
 
+
+class Base:
+    def __init__(self, level):
+        self.title = "map.txt"
+
+        self.fon = None
+        self.k = 0
+        self.r = 0
+        self.count = 0
+        self.portal_animation = 0
+        pygame.init()
+        self.screen = pygame.display.set_mode((800, 600))
+        self.screen.fill((0, 0, 0))
+        pygame.display.flip()
+        self.clock = pygame.time.Clock()
+        self.player = None
+        self.up, self.down, self.left, self.right = False, False, False, False
+        self.all_sprites = pygame.sprite.Group()
+        self.tiles_group = pygame.sprite.Group()
+        self.walls_group = pygame.sprite.Group()
+        self.chests_group = pygame.sprite.Group()
+        self.enemies_group = pygame.sprite.Group()
+        self.portal_group = pygame.sprite.Group()
+        self.aim_group = pygame.sprite.Group()
+        self.indestructible_walls_group = pygame.sprite.Group()
+        self.tile_width = self.tile_height = 50
+        self.level = level
+
+    def b(self):
+        self.board = Board()
+        self.aim = pygame.sprite.Sprite(base.all_sprites, base.aim_group)
+        self.aim.image = aim_image
+        self.aim.rect = self.aim.image.get_rect()
+        self.aim.rect.x = 0
+        self.aim.rect.y = 100
+        base.player = self.board.generate_level()
+        self.camera = Camera()
+        self.cursor = Cursor(pygame.mouse.get_pos)
+        self.cursor.image = pygame.transform.scale(load_image("cursor.png", -1), (20, 21))
+        self.cursor.rect = self.cursor.image.get_rect()
+        pygame.mouse.set_visible(False)
+        self.running = True
+        self.pressed = ''
+        self.board.player_hp = player_hp
+
+
+player_hp = 100
+base = Base(1)
+
+tile_images = {'empty': pygame.transform.scale(load_image('empty.png'), (50, 50)),
+               'wall': pygame.transform.scale(load_image('wall.png'), (50, 50)),
+               'indestructible_wall': pygame.transform.scale(load_image('indestructible_wall.png'), (50, 50))}
+player_image = pygame.transform.scale(load_image('down1.png', -1), (45, 55))
+enemy_image = pygame.transform.scale(load_image('enemy.png', -1), (50, 50))
+boss_image = pygame.transform.scale(load_image('boss.png', -1), (50, 50))
+closed_chest_image = pygame.transform.scale(load_image('chest_closed.png', -1), (45, 40))
+opened_chest_image = pygame.transform.scale(load_image('chest_open.png', -1), (45, 40))
+aim_image = pygame.transform.scale(load_image('aim.png'), (45, 45))
+aim2_image = pygame.transform.scale(load_image('aim2.png', -1), (30, 30))
+start_button_image = pygame.transform.scale(load_image('start.png'), (600, 300))
+restart_button_image = pygame.transform.scale(load_image('restart_button.png', -1), (300, 150))
+portal_image = pygame.transform.scale(load_image('portal1.png', -1), (35, 45))
 
 start_screen()
-board = Board()
-aim = pygame.sprite.Sprite(all_sprites, aim_group)
-aim.image = aim_image
-aim.rect = aim.image.get_rect()
-aim.rect.x = 0
-aim.rect.y = 100
-player = board.generate_level()
-camera = Camera()
-cursor = Cursor(pygame.mouse.get_pos)
-cursor.image = pygame.transform.scale(load_image("cursor.png", -1), (20, 21))
-cursor.rect = cursor.image.get_rect()
-pygame.mouse.set_visible(False)
-running = True
-pressed = ''
-while running:
+base.b()
+
+while base.running:
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
+            terminate()
         if event.type == pygame.MOUSEMOTION:
             if pygame.mouse.get_focused():
-                cursor.rect.x = event.pos[0]
-                cursor.rect.y = event.pos[1]
-        if not pressed:
+                base.cursor.rect.x = event.pos[0]
+                base.cursor.rect.y = event.pos[1]
+        if not base.pressed:
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_RIGHT:
-                    pressed = 'right'
+                    base.pressed = 'right'
                 if event.key == pygame.K_LEFT:
-                    pressed = 'left'
+                    base.pressed = 'left'
                 if event.key == pygame.K_UP:
-                    pressed = 'up'
+                    base.pressed = 'up'
                 if event.key == pygame.K_DOWN:
-                    pressed = 'down'
+                    base.pressed = 'down'
             if event.type == pygame.MOUSEBUTTONDOWN:
                 if event.button == 1:
-                    cursor.update()
-    clock.tick(120)
+                    base.cursor.update()
+    base.clock.tick(120)
     update_screen()
